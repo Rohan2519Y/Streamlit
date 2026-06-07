@@ -1,6 +1,7 @@
 import streamlit as st
 import pymysql as sql
 from streamlit_option_menu import option_menu
+from datetime import datetime
 
 st.set_page_config(
     layout='wide',
@@ -119,7 +120,6 @@ if st.session_state.get("SMT"):
                 for i in L
             ]
             query = f"insert into {st.session_state.TableData} values ({', '.join(V)})"
-            st.write(query)
             if st.button("Submit"):
                 try:
                     SMT.execute(query)
@@ -135,15 +135,122 @@ if st.session_state.get("SMT"):
 
     elif menu == 'Update':
         if 'TableData' in st.session_state:
-            st.title(f"Database - {st.session_state.Tables}")
-            st.title(f"Table - {st.session_state.TableData}")
+            try:
+                st.title(f"Database - {st.session_state.Tables}")
+                st.title(f"Table - {st.session_state.TableData}")        
+                SMT.execute(f"Describe {st.session_state.TableData}")
+                TD = SMT.fetchall()
+                for i in TD:
+                    if 'PRI' in i['Key']:
+                        st.session_state.PrimaryKey = i['Field']
+                        TD.remove(i)
+                        break
+                ID = st.text_input(f"Enter {st.session_state.PrimaryKey} which you want to edit")
+                st.session_state.ID = ID
+                if ID:
+                    SMT.execute(f"select * from {st.session_state.TableData} where {st.session_state.PrimaryKey} = {int(ID)}")
+                    Record = SMT.fetchone()
+                    del Record[f'{st.session_state.PrimaryKey}']
+                    st.session_state.Record = Record
+                
+                if st.button("Fetch Details"):
+                    st.session_state.show = True
+                
+                if st.session_state.get("show", False):
+                    L = []
+                    for i in TD:
+                        if 'date' in i['Type']:
+                            Data = st.date_input(f"{i['Field']}", value=datetime.strptime(str(st.session_state.Record[i['Field']]), "%Y-%m-%d").date())
+                        else:
+                            Data = st.text_input(f"{i['Field']}", value = st.session_state.Record[i['Field']])
+                        D = {}
+                        D[i['Field']] = Data
+                        L.append(D)
+                    Q = [f"{list(i.keys())[0]}='{list(i.values())[0]}'" for i in L]
+                    query = f"update {st.session_state.TableData} set {', '.join(Q)} where {st.session_state.PrimaryKey} = {st.session_state.ID}"
+                    if st.button("Submit"):
+                        try:
+                            SMT.execute(query)
+                            if DB:
+                                DB.commit()
+                                st.success("Data Submitted Successfully")
+                                st.session_state.show = False
+                            else:
+                                st.error("Database connection not found")
+                        except Exception as E:
+                            st.error(E)
+            except Exception as E:
+                st.error(E)
         else:
             st.write("Please Select the Table First")
 
     elif menu == 'Delete':
         if 'TableData' in st.session_state:
-            st.title(f"Database - {st.session_state.Tables}")
-            st.title(f"Table - {st.session_state.TableData}")
+            try:
+                st.title(f"Database - {st.session_state.Tables}")
+                st.title(f"Table - {st.session_state.TableData}")        
+                SMT.execute(f"Describe {st.session_state.TableData}")
+                TD = SMT.fetchall()
+                for i in TD:
+                    if 'PRI' in i['Key']:
+                        st.session_state.PrimaryKey = i['Field']
+                        TD.remove(i)
+                        break
+                ID = st.text_input(f"Enter {st.session_state.PrimaryKey} which you want to Delete")
+                st.session_state.ID = ID
+                if ID:
+                    SMT.execute(f"select * from {st.session_state.TableData} where {st.session_state.PrimaryKey} = {int(ID)}")
+                    Record = SMT.fetchone()
+                    del Record[f'{st.session_state.PrimaryKey}']
+                    st.session_state.Record = Record
+                
+                if st.button("Fetch Details"):
+                    @st.dialog("Delete Confirm")
+                    def Dialog():
+                        st.title("Do you Want to delete")
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if st.button("Yes"):
+                                try:
+                                    SMT.execute(query)
+                                    if DB:
+                                        DB.commit()
+                                        st.success("Data Submitted Successfully")
+                                        st.session_state.show = False
+                                    else:
+                                        st.error("Database connection not found")
+                                except Exception as E:
+                                    st.error(E)
+                        with col2:
+                            if st.button("No"):
+                                st.info("Delete Cancel")
+                    Dialog()
+                
+                
+                    L = []
+                    for i in TD:
+                        if 'date' in i['Type']:
+                            Data = st.date_input(f"{i['Field']}", value=datetime.strptime(str(st.session_state.Record[i['Field']]), "%Y-%m-%d").date())
+                        else:
+                            Data = st.text_input(f"{i['Field']}", value = st.session_state.Record[i['Field']])
+                        D = {}
+                        D[i['Field']] = Data
+                        L.append(D)
+                    Q = [f"{list(i.keys())[0]}='{list(i.values())[0]}'" for i in L]
+                    query = f"update {st.session_state.TableData} set {', '.join(Q)} where {st.session_state.PrimaryKey} = {st.session_state.ID}"
+                    if st.button("Submit"):
+                        try:
+                            SMT.execute(query)
+                            if DB:
+                                DB.commit()
+                                st.success("Data Submitted Successfully")
+                                st.session_state.show = False
+                            else:
+                                st.error("Database connection not found")
+                        except Exception as E:
+                            st.error(E)
+            except Exception as E:
+                st.error(E)
         else:
             st.write("Please Select the Table First")
 
