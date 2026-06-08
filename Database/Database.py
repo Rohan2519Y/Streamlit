@@ -87,6 +87,8 @@ if st.session_state.get("SMT"):
         SMT.execute("SHOW DATABASES")
         Record = SMT.fetchall()
         options = ['Select Database'] + list(map(lambda v: v['Database'], Record))
+        if st.session_state.get("DatabaseIndex", 0) >= len(options):
+            st.session_state.DatabaseIndex = 0
         Database = st.selectbox(
             "Select Database",
             options,
@@ -197,26 +199,28 @@ if st.session_state.get("SMT"):
                         TD.remove(i)
                         break
                 ID = st.text_input(f"Enter {st.session_state.PrimaryKey} which you want to Delete")
-                st.session_state.ID = ID
                 if ID:
                     SMT.execute(f"select * from {st.session_state.TableData} where {st.session_state.PrimaryKey} = {int(ID)}")
                     Record = SMT.fetchone()
-                    del Record[f'{st.session_state.PrimaryKey}']
-                    st.session_state.Record = Record
-                
+                    if Record:
+                        del Record[f'{st.session_state.PrimaryKey}']
+                        st.session_state.Record = Record
+                    else:
+                        st.info("Record Not Found")                
                 if st.button("Fetch Details"):
                     @st.dialog("Delete Confirm")
                     def Dialog():
                         st.title("Do you Want to delete")
+                        st.dataframe(Record)
                         col1, col2 = st.columns(2)
                         with col1:
                             if st.button("Yes"):
                                 try:
+                                    query = f"delete from {st.session_state.TableData} where {st.session_state.PrimaryKey} = {int(ID)}"
                                     SMT.execute(query)
                                     if DB:
                                         DB.commit()
-                                        st.success("Data Submitted Successfully")
-                                        st.session_state.show = False
+                                        st.success("Data Deleted Successfully")
                                     else:
                                         st.error("Database connection not found")
                                 except Exception as E:
@@ -225,30 +229,6 @@ if st.session_state.get("SMT"):
                             if st.button("No"):
                                 st.info("Delete Cancel")
                     Dialog()
-                
-                
-                    L = []
-                    for i in TD:
-                        if 'date' in i['Type']:
-                            Data = st.date_input(f"{i['Field']}", value=datetime.strptime(str(st.session_state.Record[i['Field']]), "%Y-%m-%d").date())
-                        else:
-                            Data = st.text_input(f"{i['Field']}", value = st.session_state.Record[i['Field']])
-                        D = {}
-                        D[i['Field']] = Data
-                        L.append(D)
-                    Q = [f"{list(i.keys())[0]}='{list(i.values())[0]}'" for i in L]
-                    query = f"update {st.session_state.TableData} set {', '.join(Q)} where {st.session_state.PrimaryKey} = {st.session_state.ID}"
-                    if st.button("Submit"):
-                        try:
-                            SMT.execute(query)
-                            if DB:
-                                DB.commit()
-                                st.success("Data Submitted Successfully")
-                                st.session_state.show = False
-                            else:
-                                st.error("Database connection not found")
-                        except Exception as E:
-                            st.error(E)
             except Exception as E:
                 st.error(E)
         else:
@@ -258,5 +238,19 @@ if st.session_state.get("SMT"):
         if 'TableData' in st.session_state:
             st.title(f"Database - {st.session_state.Tables}")
             st.title(f"Table - {st.session_state.TableData}")
+            SMT.execute(f"Describe {st.session_state.TableData}")
+            TD = SMT.fetchall()
+            search = st.text_input("Search", placeholder = 'Search Anything', key = 'search')
+            L = " OR ".join([f"{i['Field']} LIKE '%{search}%'" for i in TD])
+            if search:
+                Q = f"select * from {st.session_state.TableData} where ({L})"
+                SMT.execute(Q)
+                if DB:
+                    Record = SMT.fetchall()
+                    st.dataframe(Record)
+                else:
+                    st.error("Database connection not found")
+            else:
+                st.warning("Enter Something....")
         else:
             st.write("Please Select the Table First")
